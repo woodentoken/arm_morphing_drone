@@ -3,7 +3,7 @@ syms pn_dot pe_dot h_dot u_dot v_dot w_dot phi_dot theta_dot psi_dot p_dot q_dot
 syms pn pe h u v w phi theta psi p q r 
 syms l_f l_r l_b l_l k1 k2 delta_f delta_r delta_l delta_b g 
 
-% Interpolation of thrust from dataset
+%% Interpolation of thrust from dataset
 function thrust = get_thrust_from_throttle(throttle_percentage, throttle_table, thrust_table)
     % Inputs:
     %   throttle_percentage: The throttle percentage input (0 to 100%)
@@ -19,7 +19,8 @@ function thrust = get_thrust_from_throttle(throttle_percentage, throttle_table, 
     thrust = interp1(throttle_table, thrust_table, throttle_percentage, 'linear');
 end
 
-% Calcultate CG location and mass moment of inertia of the quadcopter J_matrix_body
+% CG location
+%% Calcultate CG location and mass moment of inertia of the quadcopter J_matrix_body
 function [CG_matrix, J_matrix_body, m_tot] = calculate_CG_Moment_of_inertia(l_f, l_r, l_b, l_l, t_motor, t_prop, d_cube, m_motor, m_prop, m_arm, m_cube, r_motor, r_prop)
 % inputs:     Arm_lengths: (m)
 %               l_f, 
@@ -175,6 +176,7 @@ function [CG_matrix, J_matrix_body, m_tot] = calculate_CG_Moment_of_inertia(l_f,
 
 end
 
+%% Equation of motion calculation 
 function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_body, m_tot, k1, k2, g, l_f, l_r, l_b, l_l)
 % Function to calculate the equations of motion of the quadcopter
 % Inputs:
@@ -251,6 +253,7 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
 end
 
 
+%% Script
 % Define the parameters
 % Arm length
 max_arm_length = 0.2;
@@ -272,7 +275,7 @@ for i = 1:length(arm_length_num)
                 l_l_abs = arm_length_num(z); 
                 % Append the current combination with correct signs
                 combination_length = [combination_length; ...
-                    l_f_abs, l_r_abs, -l_b_abs, -l_l_abs];
+                    l_f_abs, l_r_abs, l_b_abs, l_l_abs];
             end
         end
     end
@@ -323,6 +326,9 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     
     % Calculate equation of motion
     equation_of_motion = calculate_quadcopter_eom(control_matrix_x, control_matrix_u, J_matrix_body, m_tot, k1, k2, g, l_f, l_r, l_b, l_l);
+
+    sympref('FloatingPointOutput',true);
+    vpa(equation_of_motion);
     
     % Jacobian Matrix:
     jaco_about_x = jacobian(equation_of_motion, control_matrix_x);
@@ -330,11 +336,32 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     
     % Initial Conditions:
     syms psi_zero pn_zero pe_zero h_zero
-    A_matrix = subs(jaco_about_x, [pn pe h u v w phi theta psi p q r], initial_condition_state);
-    B_matrix = subs(jaco_about_u, [delta_f delta_r delta_b delta_l], [(m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1))]);
+    states = [pn pe h   u v w   phi theta   psi p q r];
+    inputs = [delta_f delta_r delta_b delta_l];
+    A_matrix = subs(jaco_about_x, states, initial_condition_state);
+    B_matrix = subs(jaco_about_u, inputs, [(m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1))]);
     
     A = double(A_matrix);
     B = double(B_matrix);
+    C = eye(size(A));
+    D = 0;
+
+    linsys = ss(A,B,C,D);
+    linsys.OutputName = {'pn', 'pe', 'h', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r'};
+    linsys.InputName = {'delta_f', 'delta_r', 'delta_b', 'delta_l'};
+
+    % sample LQR controller
+    % naively selecting Q and R as Identity matrices
+    Q = eye(size(A));
+    R = eye(size(B,2));
+    controllability = rank(ctrb(A,B));
+    disp(["controllability rank", num2str(controllability)])
+
+    [K, S, P] = lqr(linsys, Q, R);
+
+    linsys_cl = ss(A-B*K, B, C, D);
+    linsys_cl.OutputName = {'pn', 'pe', 'h', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r'};
+    linsys_cl.InputName = {'delta_f', 'delta_r', 'delta_b', 'delta_l'};
 
     % Round arm lengths to integers for file naming convention
     l_f_int = round(l_f * 100);
