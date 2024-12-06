@@ -370,18 +370,57 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     linsys_cl.InputName = {'delta_f', 'delta_r', 'delta_b', 'delta_l'};
 
     % plot stat
-    hold on
-    color = [1-(c/length(combination_length)), 0, c/length(combination_length)];
-    initial_condition = [0,0,0,10,0,0,0,0,0,0,4,0];
-    inputs = zeros(50,4);
-    time = linspace(0,5,50);
+    color_1 = [1 - c/(1.5*length(combination_length)), 0, 0];
+    color_2 = [0, 1 - c/(1.5*length(combination_length)), 0];
+    color_3 = [0, 0, 1 - c/(1.5*length(combination_length))];
+    initial_condition = [10,10,10,0,0,0,0,0,0,0,0,0];
+    num_times = 200;
+    inputs = zeros(num_times,4); % zero input case, this is only initial condition response!
+    time = linspace(0,5,num_times);
 
     % lp = lsimplot(linsys_cl, inputs, time, initial_condition_state, plotopts);
-    ll = lsim(linsys_cl, inputs, time, initial_condition);
-    plot(ll(:, 1), 'Color', color, 'Marker', '*')
-    plot(ll(:, 2), 'Color', color, 'Marker', 'o')
-    plot(ll(:, 3), 'Color', color, 'Marker', 's')
+    linear_simulation_results = lsim(linsys_cl, inputs, time, initial_condition);
+
+    subplot(4,1,1)
+    hold on
+    plot(time, linear_simulation_results(:, 1), 'Color', color_1)
+    plot(time, linear_simulation_results(:, 2), 'Color', color_2)
+    plot(time, linear_simulation_results(:, 3), 'Color', color_3)
     legend('pn', 'pe', 'h')
+    ylabel('position (m)')
+    xlabel('time (s)')
+    grid on
+
+    subplot(4,1,2)
+    hold on
+    plot(time, linear_simulation_results(:, 4), 'Color', color_1)
+    plot(time, linear_simulation_results(:, 5), 'Color', color_2)
+    plot(time, linear_simulation_results(:, 6), 'Color', color_3)
+    legend('u', 'v', 'w')
+    ylabel('translational rates (m/s)')
+    xlabel('time (s)')
+    grid on
+
+    subplot(4,1,3)
+    hold on
+    plot(time, linear_simulation_results(:, 7).*(180/pi), 'Color', color_1)
+    plot(time, linear_simulation_results(:, 8).*(180/pi), 'Color', color_2)
+    plot(time, linear_simulation_results(:, 9).*(180/pi), 'Color', color_3)
+    legend('phi', 'theta', 'psi')
+    ylabel('attitude (degrees)')
+    xlabel('time (s)')
+    grid on
+
+    subplot(4,1,4)
+    hold on
+    plot(time, linear_simulation_results(:, 10).*(180/pi), 'Color', color_1)
+    plot(time, linear_simulation_results(:, 11).*(180/pi), 'Color', color_2)
+    plot(time, linear_simulation_results(:, 12).*(180/pi), 'Color', color_3)
+    legend('p', 'q', 'r')
+    ylabel('angular rates (degrees/s)')
+    xlabel('time (s)')
+    grid on
+
     % Round arm lengths to integers for file naming convention
     l_f_int = round(l_f * 100);
     l_r_int = round(l_r * 100);
