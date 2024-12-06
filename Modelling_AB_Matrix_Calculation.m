@@ -264,6 +264,7 @@ arm_length_num = linspace(min_arm_length, max_arm_length, number_of_discretizati
 % Initialize combination group
 combination_length = [];
 
+ID = 0;
 % Creating all possible combinations by different length
 for i = 1:length(arm_length_num)
     l_f_abs = arm_length_num(i);
@@ -273,9 +274,10 @@ for i = 1:length(arm_length_num)
             l_b_abs = arm_length_num(k);
             for z = 1:length(arm_length_num)
                 l_l_abs = arm_length_num(z); 
+                ID = ID+1;
                 % Append the current combination with correct signs
                 combination_length = [combination_length; ...
-                    l_f_abs, l_r_abs, l_b_abs, l_l_abs];
+                    l_f_abs, l_r_abs, l_b_abs, l_l_abs, ID];
             end
         end
     end
@@ -310,7 +312,11 @@ if ~exist(output_folder, 'dir')
     mkdir(output_folder);
 end
 
+disp(combination_length)
 for c = 1:size(combination_length, 1)  % Use size for correct row count
+% c_symmetric = [1,41, 81];
+% for i = 1:size(c_symmetric,2)
+    % c = c_symmetric(i);
     l_f = combination_length(c, 1);    % Front arm length
     l_r = combination_length(c, 2);    % Right arm length
     l_b = combination_length(c, 3);    % Back arm length
@@ -336,7 +342,7 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     
     % Initial Conditions:
     syms psi_zero pn_zero pe_zero h_zero
-    states = [pn pe h   u v w   phi theta   psi p q r];
+    states = [pn pe h   u v w   phi theta psi   p q r];
     inputs = [delta_f delta_r delta_b delta_l];
     A_matrix = subs(jaco_about_x, states, initial_condition_state);
     B_matrix = subs(jaco_about_u, inputs, [(m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1))]);
@@ -355,7 +361,7 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     Q = eye(size(A));
     R = eye(size(B,2));
     controllability = rank(ctrb(A,B));
-    disp(["controllability rank", num2str(controllability)])
+    % disp(["controllability rank", num2str(controllability)])
 
     [K, S, P] = lqr(linsys, Q, R);
 
@@ -363,6 +369,19 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     linsys_cl.OutputName = {'pn', 'pe', 'h', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r'};
     linsys_cl.InputName = {'delta_f', 'delta_r', 'delta_b', 'delta_l'};
 
+    % plot stat
+    hold on
+    color = [1-(c/length(combination_length)), 0, c/length(combination_length)];
+    initial_condition = [0,0,0,10,0,0,0,0,0,0,4,0];
+    inputs = zeros(50,4);
+    time = linspace(0,5,50);
+
+    % lp = lsimplot(linsys_cl, inputs, time, initial_condition_state, plotopts);
+    ll = lsim(linsys_cl, inputs, time, initial_condition);
+    plot(ll(:, 1), 'Color', color, 'Marker', '*')
+    plot(ll(:, 2), 'Color', color, 'Marker', 'o')
+    plot(ll(:, 3), 'Color', color, 'Marker', 's')
+    legend('pn', 'pe', 'h')
     % Round arm lengths to integers for file naming convention
     l_f_int = round(l_f * 100);
     l_r_int = round(l_r * 100);
