@@ -61,11 +61,11 @@ function [CG_matrix, J_matrix_body, m_tot] = calculate_CG_Moment_of_inertia(l_f,
     
     % CG location in x,y
     % X-axis CG calculation
-    numerator_X = (m_motor + m_prop) * l_f + m_arm * (l_f / 2) + (m_motor + m_prop) * l_b + m_arm * (l_b / 2);
-    X_cg = numerator_X / m_tot;
+    numerator_X = (m_motor + m_prop) * l_f + m_arm * (l_f / 2) + (m_motor + m_prop) * l_b + m_arm * (l_b / 2)
+    X_cg = numerator_X / m_tot
     % Y-axis CG calculation
     numerator_Y = (m_motor + m_prop) * l_r + m_arm * (l_r / 2) + (m_motor + m_prop) * l_l + m_arm * (l_l / 2);
-    Y_cg = numerator_Y / m_tot;
+    Y_cg = numerator_Y / m_tot
     
     d_f_motor_prop = sqrt((l_f-X_cg)^2+Y_cg^2);
     d_b_motor_prop = sqrt((l_b-X_cg)^2+Y_cg^2);
@@ -232,8 +232,8 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
     
     % Rotational Dynamics
     % Torques due to rotor thrusts
-    tau_x = l_f * k1 * delta_f - l_b * k1 * delta_b; % Front-back torques
-    tau_y = l_r * k1 * delta_r - l_l * k1 * delta_l; % Right-left torques
+    tau_x = l_f * k1 * delta_f + l_b * k1 * delta_b; % Front-back torques
+    tau_y = l_r * k1 * delta_r + l_l * k1 * delta_l; % Right-left torques
     tau_z = k2 * (-delta_f + delta_r - delta_b + delta_l); % Yaw torque due to rotor drag
     
     % Total torques
@@ -277,7 +277,7 @@ for i = 1:length(arm_length_num)
                 ID = ID+1;
                 % Append the current combination with correct signs
                 combination_length = [combination_length; ...
-                    l_f_abs, l_r_abs, l_b_abs, l_l_abs, ID];
+                    l_f_abs, l_r_abs, -l_b_abs, -l_l_abs, ID];
             end
         end
     end
@@ -312,16 +312,21 @@ if ~exist(output_folder, 'dir')
     mkdir(output_folder);
 end
 
-disp(combination_length)
-for c = 1:size(combination_length, 1)  % Use size for correct row count
+combination_length_roll = [[0.2 0.4 -0.2 -0.2 1];
+    [0.4 0.2 -0.4 -0.4 2];
+    [0.3 0.3 -0.3 -0.3 3]];
+
+
+disp(combination_length_roll)
+for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
 % c_symmetric = [1,41, 81];
 % for i = 1:size(c_symmetric,2)
     % c = c_symmetric(i);
-    l_f = combination_length(c, 1);    % Front arm length
-    l_r = combination_length(c, 2);    % Right arm length
-    l_b = combination_length(c, 3);    % Back arm length
-    l_l = combination_length(c, 4);    % Left arm length
-    config = [l_f, l_r, l_b, l_l];
+    l_f = combination_length_roll(c, 1);    % Front arm length
+    l_r = combination_length_roll(c, 2);    % Right arm length
+    l_b = combination_length_roll(c, 3);    % Back arm length
+    l_l = combination_length_roll(c, 4);    % Left arm length
+    config = [l_f, l_r, l_b, l_l]
 
     % Define state
     control_matrix_x = [pn; pe; h; u; v; w; phi; theta; psi; p; q; r];
@@ -359,33 +364,37 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     % sample LQR controller
     % naively selecting Q and R as Identity matrices
     Q = eye(size(A));
-    R = eye(size(B,2));
+    R = 10.*eye(size(B,2));
     controllability = rank(ctrb(A,B));
-    % disp(["controllability rank", num2str(controllability)])
+    disp(["controllability rank", num2str(controllability)])
 
     [K, S, P] = lqr(linsys, Q, R);
-
+    
     linsys_cl = ss(A-B*K, B, C, D);
+
     linsys_cl.OutputName = {'pn', 'pe', 'h', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r'};
     linsys_cl.InputName = {'delta_f', 'delta_r', 'delta_b', 'delta_l'};
 
     % plot stat
-    color_1 = [1 - c/(1.5*length(combination_length)), 0, 0];
-    color_2 = [0, 1 - c/(1.5*length(combination_length)), 0];
-    color_3 = [0, 0, 1 - c/(1.5*length(combination_length))];
-    initial_condition = [10,10,10,0,0,0,0,0,0,0,0,0];
+    color_1 = [1 - c/(0.6*length(combination_length_roll)), 0, 0];
+    color_2 = [0, 1 - c/(0.6*length(combination_length_roll)), 0];
+    color_3 = [0, 0, 1 - c/(0.6*length(combination_length_roll))];
+    initial_condition = [0,0,0, 0,0,0, pi/4,0,0, 0,0,0];
     num_times = 200;
     inputs = zeros(num_times,4); % zero input case, this is only initial condition response!
+    %inputs(:,2) = 1;
     time = linspace(0,5,num_times);
 
     % lp = lsimplot(linsys_cl, inputs, time, initial_condition_state, plotopts);
     linear_simulation_results = lsim(linsys_cl, inputs, time, initial_condition);
-
+    
     subplot(4,1,1)
     hold on
-    plot(time, linear_simulation_results(:, 1), 'Color', color_1)
-    plot(time, linear_simulation_results(:, 2), 'Color', color_2)
-    plot(time, linear_simulation_results(:, 3), 'Color', color_3)
+    plot(time, linear_simulation_results(:, 1), 'Color', color_1, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 2), 'Color', color_2, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 3), 'Color', color_3, 'LineWidth', 2)
+
+    set(gca,'fontsize',16)
     legend('pn', 'pe', 'h')
     ylabel('position (m)')
     xlabel('time (s)')
@@ -393,33 +402,37 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
 
     subplot(4,1,2)
     hold on
-    plot(time, linear_simulation_results(:, 4), 'Color', color_1)
-    plot(time, linear_simulation_results(:, 5), 'Color', color_2)
-    plot(time, linear_simulation_results(:, 6), 'Color', color_3)
-    legend('u', 'v', 'w')
+    plot(time, linear_simulation_results(:, 4), 'Color', color_1, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 5), 'Color', color_2, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 6), 'Color', color_3, 'LineWidth', 2)
+    set(gca,'fontsize',16)
+    legend('u', 'v', 'w');
     ylabel('translational rates (m/s)')
     xlabel('time (s)')
     grid on
 
     subplot(4,1,3)
     hold on
-    plot(time, linear_simulation_results(:, 7).*(180/pi), 'Color', color_1)
-    plot(time, linear_simulation_results(:, 8).*(180/pi), 'Color', color_2)
-    plot(time, linear_simulation_results(:, 9).*(180/pi), 'Color', color_3)
+    plot(time, linear_simulation_results(:, 7).*(180/pi), 'Color', color_1, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 8).*(180/pi), 'Color', color_2, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 9).*(180/pi), 'Color', color_3, 'LineWidth', 2 )
+    set(gca,'fontsize',16)
     legend('phi', 'theta', 'psi')
-    ylabel('attitude (degrees)')
+    ylabel('angles (degrees)')
     xlabel('time (s)')
     grid on
 
     subplot(4,1,4)
     hold on
-    plot(time, linear_simulation_results(:, 10).*(180/pi), 'Color', color_1)
-    plot(time, linear_simulation_results(:, 11).*(180/pi), 'Color', color_2)
-    plot(time, linear_simulation_results(:, 12).*(180/pi), 'Color', color_3)
+    plot(time, linear_simulation_results(:, 10).*(180/pi), 'Color', color_1, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 11).*(180/pi), 'Color', color_2, 'LineWidth', 2)
+    plot(time, linear_simulation_results(:, 12).*(180/pi), 'Color', color_3, 'LineWidth', 2)
+    set(gca,'fontsize',16)
     legend('p', 'q', 'r')
     ylabel('angular rates (degrees/s)')
     xlabel('time (s)')
     grid on
+    
 
     % Round arm lengths to integers for file naming convention
     l_f_int = round(l_f * 100);
@@ -432,6 +445,8 @@ for c = 1:size(combination_length, 1)  % Use size for correct row count
     filename = fullfile(output_folder, sprintf('%s.mat', config_name));
     save(filename, 'config', 'A', 'B');
 end
+
+
 
 disp('Saved to Modelling_AB_results folder');
 
