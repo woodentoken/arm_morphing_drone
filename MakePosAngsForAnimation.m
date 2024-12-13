@@ -54,4 +54,4 @@ view([0 0])
 
 %[positionTbl,rotationTbl,traj] = ShowUAVTrajectory(waypoints1)
 
-[positionTbl,rotationTbl,traj] = ShowUAVTrajectory2(waypoints,Positions,Angles)
+% [positionTbl,rotationTbl,traj] = ShowUAVTrajectory2(waypoints,Positions,Angles)

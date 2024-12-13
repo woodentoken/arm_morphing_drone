@@ -1,5 +1,5 @@
 %% Equation of motion calculation 
-function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_body, m_tot, config)
+function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_body, CG_matrix, m_tot, config)
 % Function to calculate the equations of motion of the quadcopter
 % Inputs:
 %   state: [pn; pe; h; u; v; w; phi; theta; psi; p; q; r]
@@ -18,6 +18,9 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
     l_b = config(3);
     l_l = config(4);
     load_constant_values
+
+    X_cg = CG_matrix(1);
+    Y_cg = CG_matrix(2);
 
     % Extract state variables
     pn = state(1); pe = state(2); h = state(3);
@@ -60,8 +63,8 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
     
     % Rotational Dynamics
     % Torques due to rotor thrusts
-    tau_x = l_f * k1 * delta_f + l_b * k1 * delta_b; % Front-back torques
-    tau_y = l_r * k1 * delta_r + l_l * k1 * delta_l; % Right-left torques
+    tau_x = - (l_r-Y_cg) * k1 * delta_r - (l_l-Y_cg) * k1 * delta_l; % Front-back torques
+    tau_y = (l_f-X_cg) * k1 * delta_f + (l_b-X_cg) * k1 * delta_b; % Right-left torques
     tau_z = k2 * (-delta_f + delta_r - delta_b + delta_l); % Yaw torque due to rotor drag
     
     % Total torques
@@ -73,8 +76,11 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
         0, (J_matrix_body(3, 3) - J_matrix_body(1, 1)) / J_matrix_body(2, 2), 0;
         0, 0, (J_matrix_body(1, 1) - J_matrix_body(2, 2)) / J_matrix_body(3, 3)
     ];
+    % rotational_coupling = [q * r; p * r; p * q];
     rotational_coupling = [q * r; p * r; p * q];
     rotational_velocity_dot = rotational_dynamics_matrix * rotational_coupling + (J_matrix_body \ control_torque);
+    rotational_velocity_dot = inv(J_matrix_body) * (control_torque - cross([p;q;r], J_matrix_body*[p;q;r]));
+    % Combine EOMs
     
     % Combine EOMs
     state_dot = [position_dot; linear_velocity_dot; angular_velocity_dot; rotational_velocity_dot];

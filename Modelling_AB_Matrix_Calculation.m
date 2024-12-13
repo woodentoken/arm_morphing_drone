@@ -2,6 +2,7 @@ format long
 syms pn_dot pe_dot h_dot u_dot v_dot w_dot phi_dot theta_dot psi_dot p_dot q_dot r_dot
 syms pn pe h u v w phi theta psi p q r 
 syms l_f l_r l_b l_l k1 k2 delta_f delta_r delta_l delta_b g 
+close all
 
 %% Interpolation of thrust from dataset
 function thrust = get_thrust_from_throttle(throttle_percentage, throttle_table, thrust_table)
@@ -54,7 +55,7 @@ end
 % % Define the throttle percentages and corresponding thrusts
 % throttle_table = [50, 62.5, 75, 88, 100];  % Throttle percentages (%)
 % thrust_table = [666, 832.5, 999, 1165.5, 1332];  % Single thrust (g)
-initial_condition_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+% initial_condition_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 % Specify the folder name
 output_folder = 'Modelling_AB_results';
@@ -64,20 +65,63 @@ if ~exist(output_folder, 'dir')
     mkdir(output_folder);
 end
 
-combination_length_roll =[    
-    [0.3 0.3 -0.3 -0.3 1];
-    [0.2 0.4 -0.2 -0.2 2];
-    [0.4 0.2 -0.4 -0.4 3];
+% asymmetric two arm
+% combination_length_roll = [    
+%     [0.4, 0.4, -0.2, -0.2];
+%     [0.3, 0.3, -0.3, -0.3];
+%     [0.3, 0.3, -0.3, -0.3];
+%     ];
+
+% asymmetric one arm
+% combination_length_roll = [   
+    % [0.2, 0.4, -0.2, -0.2];
+    % [0.4, 0.2, -0.4, -0.4];
+    % [0.4, 0.4, -0.3, -0.3];
+    % ];
+
+% inline
+% combination_length_roll = [    
+%     [0.2, 0.4, -0.2, -0.4];
+%     [0.4, 0.2, -0.4, -0.2];
+%     [0.3, 0.3, -0.3, -0.3];
+%     ];
+
+%% baseline
+combination_length_roll = [    
+    [0.3, 0.3, -0.3, -0.3];
     ];
 
-combination_length_roll =[    
-    [0.2 0.2 -0.2 -0.2 1];
-    [0.3 0.3 -0.3 -0.3 2];
-    [0.4 0.4 -0.4 -0.4 3];
-    ];
+% combination_length_roll =[    
+%     [0.2 0.2 -0.2 -0.2 1];
+%     [0.3 0.3 -0.3 -0.3 2];
+%     [0.4 0.4 -0.4 -0.4 3];
+%     ];
 
+% all configs
+% combination_length_roll = [ 
+%     % baseline
+%     [0.3, 0.3, -0.3, -0.3];
+% 
+%     % symmetric extension
+%     [0.2, 0.2, -0.2, -0.2];
+%     [0.4, 0.4, -0.4, -0.4];
+% 
+%     % one arm
+%     [0.2, 0.4, -0.2, -0.2];
+%     [0.4, 0.2, -0.4, -0.4];
+% 
+%     % inline
+%     [0.2, 0.4, -0.2, -0.4];
+%     [0.4, 0.2, -0.4, -0.2];
+% 
+%     % two arm
+%     [0.4, 0.4, -0.2, -0.2];
+%     ];
 
 % loop over the selected combinations
+entries = [];
+K_ref = load("K.mat");
+
 for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     l_f = combination_length_roll(c, 1);    % Front arm length
     l_r = combination_length_roll(c, 2);    % Right arm length
@@ -91,9 +135,13 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     
     % Calculate CG matrix, J and m_tot
     [CG_matrix, J_matrix_body, m_tot] = calculate_CG_Moment_of_inertia(config);
+
+    CG_matrix
+
+    J_matrix_body;
     
     % Calculate equation of motion
-    equation_of_motion = calculate_quadcopter_eom(control_matrix_x, control_matrix_u, J_matrix_body, m_tot, config);
+    equation_of_motion = calculate_quadcopter_eom(control_matrix_x, control_matrix_u, J_matrix_body, CG_matrix, m_tot, config);
 
     sympref('FloatingPointOutput',true);
     vpa(equation_of_motion);
@@ -109,8 +157,15 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     inputs = [delta_f delta_r delta_b delta_l];
     trim_state = [0, 0, 0,   0, 0, 0,   0, 0, 0,   0, 0, 0];
     A_matrix = subs(jaco_about_x, states, trim_state);
-    B_matrix = subs(jaco_about_u, inputs, [(m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1)), (m_tot * g / (4 * k1))]);
-    
+
+   % calculate the trim
+    balance_equation = [jaco_about_u(6, :); jaco_about_u(10:12, :)];
+    desired_force_torque = [(m_tot*g)/k1; 0; 0; 0]; 
+    trim = inv(balance_equation)*desired_force_torque;
+
+    B_matrix = subs(jaco_about_u, inputs, trim');
+    % B_matrix = subs(jaco_about_u, inputs, [(m_tot*g)/(k1*4), (m_tot*g)/(k1*4), (m_tot*g)/(k1*4), (m_tot*g)/(k1*4)]);
+
     A = double(A_matrix);
     B = double(B_matrix);
     C = eye(size(A));
@@ -122,13 +177,17 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
 
     %% sample LQR controller
     controllability = rank(ctrb(A,B));
-    if controllability < size(A,1)
-       disp(["controllability matrix is not full rank: ", num2str(controllability)]);
+    if controllability < size(A,1)       
+        disp(["controllability matrix is not full rank: ", num2str(controllability)]);
     end
 
-    Q = eye(size(A));
-    R = eye(size(B,2));
+    Q = 1.*eye(size(A));
+    Q(3,3) = 5;
+    R = 50.*eye(size(B,2));
     [K, S, P] = lqr(linsys, Q, R);
+
+    load("K.mat");
+
     linsys_cl = ss(A-B*K, B, C, D);
 
     linsys_cl.OutputName = {'pn', 'pe', 'h', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r'};
