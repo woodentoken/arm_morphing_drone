@@ -1,5 +1,6 @@
 %% Equation of motion calculation 
 function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_body, CG_matrix, m_tot, config)
+
 % Function to calculate the equations of motion of the quadcopter
 % Inputs:
 %   state: [pn; pe; h; u; v; w; phi; theta; psi; p; q; r]
@@ -13,11 +14,18 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
 % Outputs:
 %   state_dot: Time derivatives of the state vector
 
+% syms pn_dot pe_dot h_dot u_dot v_dot w_dot phi_dot theta_dot psi_dot p_dot q_dot r_dot
+% syms pn pe h u v w phi theta psi p q r 
+% syms l_f l_r l_b l_l k1 k2 delta_f delta_r delta_l delta_b g 
+
+    g=9.81;
+    k1=1;
+    k2=0.2;
+
     l_f = config(1);
     l_r = config(2);
     l_b = config(3);
     l_l = config(4);
-    load_constant_values
 
     X_cg = CG_matrix(1);
     Y_cg = CG_matrix(2);
@@ -27,7 +35,7 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
     u = state(4); v = state(5); w = state(6);
     phi = state(7); theta = state(8); psi = state(9);
     p = state(10); q = state(11); r = state(12);
-    
+
     % Extract control inputs
     delta_f = control_inputs(1);
     delta_r = control_inputs(2);
@@ -79,7 +87,7 @@ function state_dot = calculate_quadcopter_eom(state, control_inputs, J_matrix_bo
     % rotational_coupling = [q * r; p * r; p * q];
     rotational_coupling = [q * r; p * r; p * q];
     rotational_velocity_dot = rotational_dynamics_matrix * rotational_coupling + (J_matrix_body \ control_torque);
-    rotational_velocity_dot = inv(J_matrix_body) * (control_torque - cross([p;q;r], J_matrix_body*[p;q;r]));
+    % rotational_velocity_dot = inv(J_matrix_body) * (control_torque - cross([p;q;r], J_matrix_body*[p;q;r]));
     % Combine EOMs
     
     % Combine EOMs

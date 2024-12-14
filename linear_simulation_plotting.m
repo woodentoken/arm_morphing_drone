@@ -32,16 +32,16 @@
     % lp = lsimplot(linsys_cl, inputs, time, initial_condition_state, plotopts);
     % linear_simulation = lsim(linsys_cl, inputs, time, initial_condition);
 
-    output = sim("linear_system.slx");
+    output = sim("simulink/linear_system.slx");
     time = output.tout;
 
     %% linear response
     linear_simulation_states = squeeze(output.yout{1}.Values.Data)';
     linear_simulation_inputs = squeeze(output.yout{2}.Values.Data)';
-    ref_translation = squeeze(output.yout{7}.Values.Data)';
-    ref_rotation = squeeze(output.yout{8}.Values.Data)';
+
+    ref_translation = squeeze(output.yout{5}.Values.Data)';
+    ref_rotation = squeeze(output.yout{6}.Values.Data)';
     ref_rotation = 180/pi .* ref_rotation;
-    normalized_error_linear = squeeze(output.yout{5}.Values.Data)';
 
     % figure(5)
     % hold on
@@ -117,9 +117,8 @@
     grid on
 
 %% nonlinear response
-    nonlinear_simulation_states = squeeze(output.yout{4}.Values.Data)';
-    nonlinear_simulation_inputs = squeeze(output.yout{3}.Values.Data)';
-    normalized_error_nonlinear = squeeze(output.yout{6}.Values.Data)';
+    nonlinear_simulation_states = squeeze(output.yout{3}.Values.Data)';
+    nonlinear_simulation_inputs = squeeze(output.yout{4}.Values.Data)';
 
     % figure(6)
     % hold on
@@ -194,23 +193,3 @@
     xlabel('time (s)')
     grid on
     axis tight
-
-%% Eigenvalue plotting
-    % eigvals = eig(linsys_cl);
-    % 
-    % figure(1000)
-    % hold on
-    % grid on
-    % plot(eigvals, 'x', 'Color', color_1, 'MarkerSize', 15, 'LineWidth', 3);
-    % xlabel('real')
-    % ylabel('imaginary')
-    % xlim([-9 0])
-    % ylim([-3 3])
-    % legend()
-    % 
-    clear att; clear pos;
-    att = nonlinear_simulation_states(:,7:9);
-    att = [linspace(0,5,size(att,1))' att(:,3) att(:,2) att(:,1)];
-
-    pos = nonlinear_simulation_states(:,1:3);
-    pos = [linspace(0,5,size(pos,1))' pos];

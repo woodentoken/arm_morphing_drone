@@ -120,7 +120,7 @@ combination_length_roll = [
 
 % loop over the selected combinations
 entries = [];
-K_ref = load("K.mat");
+K_ref = load("K_reference.mat");
 
 for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     l_f = combination_length_roll(c, 1);    % Front arm length
@@ -135,10 +135,6 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     
     % Calculate CG matrix, J and m_tot
     [CG_matrix, J_matrix_body, m_tot] = calculate_CG_Moment_of_inertia(config);
-
-    CG_matrix
-
-    J_matrix_body;
     
     % Calculate equation of motion
     equation_of_motion = calculate_quadcopter_eom(control_matrix_x, control_matrix_u, J_matrix_body, CG_matrix, m_tot, config);
@@ -158,12 +154,12 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     trim_state = [0, 0, 0,   0, 0, 0,   0, 0, 0,   0, 0, 0];
     A_matrix = subs(jaco_about_x, states, trim_state);
 
-   % calculate the trim
+    % calculate the trim
     balance_equation = [jaco_about_u(6, :); jaco_about_u(10:12, :)];
     desired_force_torque = [(m_tot*g)/k1; 0; 0; 0]; 
-    trim = inv(balance_equation)*desired_force_torque;
+    trim_inputs = inv(balance_equation)*desired_force_torque;
 
-    B_matrix = subs(jaco_about_u, inputs, trim');
+    B_matrix = subs(jaco_about_u, inputs, trim_inputs');
     % B_matrix = subs(jaco_about_u, inputs, [(m_tot*g)/(k1*4), (m_tot*g)/(k1*4), (m_tot*g)/(k1*4), (m_tot*g)/(k1*4)]);
 
     A = double(A_matrix);
@@ -178,15 +174,12 @@ for c = 1:size(combination_length_roll, 1)  % Use size for correct row count
     %% sample LQR controller
     controllability = rank(ctrb(A,B));
     if controllability < size(A,1)       
-        disp(["controllability matrix is not full rank: ", num2str(controllability)]);
-    end
+        disp(["controllability matrix is not full rank: ", num2str(controllability)]);    end
 
     Q = 1.*eye(size(A));
     Q(3,3) = 5;
     R = 50.*eye(size(B,2));
     [K, S, P] = lqr(linsys, Q, R);
-
-    load("K.mat");
 
     linsys_cl = ss(A-B*K, B, C, D);
 
